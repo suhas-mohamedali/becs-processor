@@ -5,7 +5,7 @@ spring:
   # ── Embedded H2 Database ──────────────────────────────────────────
   datasource:
     # FILE mode: data survives restarts and can be opened by DataGrip/DBeaver
-    url: jdbc:h2:file:${BECS_DB_PATH:./data/becsdb};AUTO_SERVER=TRUE;DB_CLOSE_ON_EXIT=FALSE
+    url: jdbc:h2:file:${BECS_DB_PATH:./data/becsdb}
     driver-class-name: org.h2.Driver
     username: ${DB_USERNAME:becs}
     password: ${DB_PASSWORD:becs}
