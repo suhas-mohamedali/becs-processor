@@ -39,8 +39,10 @@ public class BpyFileParser {
         ParsedTrailer trailer = null;
 
         try (BufferedReader reader = Files.newBufferedReader(filePath, StandardCharsets.ISO_8859_1)) {
+            reader.readLine(); // always skip the first line of the file
+
             String line;
-            int lineNo = 0;
+            int lineNo = 1;
 
             while ((line = reader.readLine()) != null) {
                 lineNo++;
