@@ -47,7 +47,7 @@ public class FileStorageService {
         String outName = stripExtension(bpyFileName) + "_" + safeBsb + ".de";
         Path   outPath = dateDir.resolve(outName);
 
-        try (BufferedWriter w = Files.newBufferedWriter(outPath, StandardCharsets.UTF_8)) {
+        try (BufferedWriter w = Files.newBufferedWriter(outPath, StandardCharsets.ISO_8859_1)) {
             for (ParsedPayment p : payments) {
                 w.write(formatDetailLine(p));
                 w.newLine();

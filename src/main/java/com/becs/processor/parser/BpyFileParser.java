@@ -38,7 +38,7 @@ public class BpyFileParser {
         ParsedHeader  header  = null;
         ParsedTrailer trailer = null;
 
-        try (BufferedReader reader = Files.newBufferedReader(filePath, StandardCharsets.UTF_8)) {
+        try (BufferedReader reader = Files.newBufferedReader(filePath, StandardCharsets.ISO_8859_1)) {
             String line;
             int lineNo = 0;
 
