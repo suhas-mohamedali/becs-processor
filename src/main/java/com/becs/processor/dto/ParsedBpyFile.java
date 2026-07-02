@@ -7,7 +7,7 @@ import java.util.List;
 
 @Data @Builder
 public class ParsedBpyFile {
-    private ParsedHeader        header;
+    private List<ParsedHeader>  headers;
     private List<ParsedPayment> payments;
-    private ParsedTrailer       trailer;
+    private List<ParsedTrailer> trailers;
 }

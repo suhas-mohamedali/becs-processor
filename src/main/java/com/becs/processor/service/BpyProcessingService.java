@@ -1,7 +1,9 @@
 package com.becs.processor.service;
 
 import com.becs.processor.dto.ParsedBpyFile;
+import com.becs.processor.dto.ParsedHeader;
 import com.becs.processor.dto.ParsedPayment;
+import com.becs.processor.dto.ParsedTrailer;
 import com.becs.processor.model.*;
 import com.becs.processor.parser.BpyFileParser;
 import com.becs.processor.repository.BpyFileRepository;
@@ -27,7 +29,7 @@ import java.util.*;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class BpyProcessingService {
+public class  BpyProcessingService {
 
     private final BpyFileParser         parser;
     private final FileStorageService    fileStorage;
@@ -67,38 +69,42 @@ public class BpyProcessingService {
             // ---- 2. Parse ----
             ParsedBpyFile parsed = parser.parse(inboxPath);
 
-            // ---- 3. Save header ----
-            if (parsed.getHeader() != null) {
-                FileHeader header = FileHeader.builder()
+            // ---- 3. Save every header found (a file may contain multiple reels) ----
+            List<FileHeader> headers = new ArrayList<>();
+            for (ParsedHeader ph : parsed.getHeaders()) {
+                headers.add(FileHeader.builder()
                         .bpyFile(bpyFile)
-                        .reelSequenceNumber(parsed.getHeader().getReelSequenceNumber())
-                        .financialInstitution(parsed.getHeader().getFinancialInstitution())
-                        .userPreferredSpec(parsed.getHeader().getUserPreferredSpec())
-                        .userId(parsed.getHeader().getUserId())
-                        .description(parsed.getHeader().getDescription())
-                        .processingDate(parsed.getHeader().getProcessingDate())
-                        .build();
-                bpyFile.setFileHeader(header);
+                        .reelSequenceNumber(ph.getReelSequenceNumber())
+                        .financialInstitution(ph.getFinancialInstitution())
+                        .userPreferredSpec(ph.getUserPreferredSpec())
+                        .userId(ph.getUserId())
+                        .description(ph.getDescription())
+                        .processingDate(ph.getProcessingDate())
+                        .build());
             }
+            bpyFile.setFileHeaders(headers);
 
-            // ---- 4. Save trailer ----
-            if (parsed.getTrailer() != null) {
-                FileTrailer trailer = FileTrailer.builder()
+            // ---- 4. Save every trailer found (one per reel) ----
+            List<FileTrailer> trailers = new ArrayList<>();
+            for (ParsedTrailer pt : parsed.getTrailers()) {
+                trailers.add(FileTrailer.builder()
                         .bpyFile(bpyFile)
-                        .bsbFiller(parsed.getTrailer().getBsbFiller())
-                        .netTotalAmount(parsed.getTrailer().getNetTotalAmount())
-                        .creditTotalAmount(parsed.getTrailer().getCreditTotalAmount())
-                        .debitTotalAmount(parsed.getTrailer().getDebitTotalAmount())
-                        .recordCount(parsed.getTrailer().getRecordCount())
-                        .build();
-                bpyFile.setFileTrailer(trailer);
+                        .bsbFiller(pt.getBsbFiller())
+                        .netTotalAmount(pt.getNetTotalAmount())
+                        .creditTotalAmount(pt.getCreditTotalAmount())
+                        .debitTotalAmount(pt.getDebitTotalAmount())
+                        .recordCount(pt.getRecordCount())
+                        .build());
             }
+            bpyFile.setFileTrailers(trailers);
 
-            // ---- 5. Write the debulked file (header + all details + trailer) ----
+            // ---- 5. Write the debulked file (last header + all details + last trailer) ----
             List<ParsedPayment> payments = parsed.getPayments();
-            Path outPath = fileStorage.writeDebulkedFile(
-                    fileName, parsed.getHeader(), payments, parsed.getTrailer());
+            ParsedHeader  lastHeader  = headers.isEmpty()  ? null : parsed.getHeaders().get(parsed.getHeaders().size() - 1);
+            ParsedTrailer lastTrailer = trailers.isEmpty() ? null : parsed.getTrailers().get(parsed.getTrailers().size() - 1);
+            Path outPath = fileStorage.writeDebulkedFile(fileName, lastHeader, payments, lastTrailer);
             String outStr = outPath.toAbsolutePath().toString();
+            bpyFile.setOutputFilePath(outStr);
 
             List<PaymentRecord> records = new ArrayList<>();
             for (ParsedPayment p : payments) {

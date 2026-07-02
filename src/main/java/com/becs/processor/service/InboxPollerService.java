@@ -9,17 +9,21 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Polls the inbox directory for new .bpy files and triggers processing.
+ * Polls the inbox directory for new files and triggers processing.
  * Interval is driven by becs.poll-interval-ms (default 30 s).
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class InboxPollerService {
+
+    // {bsb_number}.bpy.nnn, e.g. 805050.bpy.001 (nnn is a 3-digit counter, 001-999)
+    private static final Pattern INPUT_FILE_PATTERN = Pattern.compile("(?i)\\d+\\.bpy\\.\\d{3}");
 
     private final BecsProperties      props;
     private final BpyProcessingService processingService;
@@ -34,7 +38,7 @@ public class InboxPollerService {
         try (Stream<Path> stream = Files.list(inbox)) {
             bpyFiles = stream
                     .filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().toLowerCase().endsWith(".bpy"))
+                    .filter(p -> INPUT_FILE_PATTERN.matcher(p.getFileName().toString()).matches())
                     .sorted()
                     .collect(Collectors.toList());
         } catch (IOException e) {

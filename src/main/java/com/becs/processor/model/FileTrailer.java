@@ -18,7 +18,7 @@ public class FileTrailer {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bpy_file_id", nullable = false)
     @ToString.Exclude
     private BpyFile bpyFile;

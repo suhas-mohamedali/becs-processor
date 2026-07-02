@@ -35,8 +35,8 @@ public class BpyFileParser {
 
     public ParsedBpyFile parse(Path filePath) throws IOException {
         List<ParsedPayment> payments = new ArrayList<>();
-        ParsedHeader  header  = null;
-        ParsedTrailer trailer = null;
+        List<ParsedHeader>  headers  = new ArrayList<>();
+        List<ParsedTrailer> trailers = new ArrayList<>();
 
         try (BufferedReader reader = Files.newBufferedReader(filePath, StandardCharsets.ISO_8859_1)) {
             reader.readLine(); // always skip the first line of the file
@@ -55,24 +55,24 @@ public class BpyFileParser {
                 char type = line.charAt(0);
 
                 switch (type) {
-                    case '0' -> header  = parseHeader(line, lineNo);
+                    case '0' -> { ParsedHeader h = parseHeader(line, lineNo); if (h != null) headers.add(h); }
                     case '1' -> payments.add(parseDetail(line, lineNo));
-                    case '7' -> trailer = parseTrailer(line, lineNo);
+                    case '7' -> trailers.add(parseTrailer(line, lineNo));
                     default  -> log.warn("Unknown record type '{}' at line {}", type, lineNo);
                 }
             }
         }
 
-        log.info("Parsed file {}: header={}, records={}, trailer={}",
+        log.info("Parsed file {}: headers={}, records={}, trailers={}",
                 filePath.getFileName(),
-                header  != null,
+                headers.size(),
                 payments.size(),
-                trailer != null);
+                trailers.size());
 
         return ParsedBpyFile.builder()
-                .header(header)
+                .headers(headers)
                 .payments(payments)
-                .trailer(trailer)
+                .trailers(trailers)
                 .build();
     }
 

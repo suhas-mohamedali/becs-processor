@@ -13,6 +13,7 @@ CREATE TABLE becs_bpy_file (
     received_at         TIMESTAMP       NOT NULL DEFAULT NOW(),
     processed_at        TIMESTAMP,
     archived_path       VARCHAR(1024),
+    output_file_path    VARCHAR(1024),
     status              VARCHAR(50)     NOT NULL DEFAULT 'RECEIVED',
     error_message       CLOB,
     record_count        INTEGER,
@@ -74,6 +75,12 @@ CREATE TABLE becs_file_trailer (
     debit_total_amount  BIGINT,
     record_count        INTEGER,
     created_at          TIMESTAMP   NOT NULL DEFAULT NOW()
+);
+
+-- Per-BSB debulked-output sequence counter (001-999, wraps back to 001)
+CREATE TABLE becs_bsb_sequence (
+    bsb_number    VARCHAR(32) PRIMARY KEY,
+    last_sequence INTEGER     NOT NULL
 );
 
 -- Processing audit log

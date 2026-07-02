@@ -4,6 +4,8 @@ import com.becs.processor.config.BecsProperties;
 import com.becs.processor.dto.ParsedHeader;
 import com.becs.processor.dto.ParsedPayment;
 import com.becs.processor.dto.ParsedTrailer;
+import com.becs.processor.model.BsbSequence;
+import com.becs.processor.repository.BsbSequenceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,12 +34,16 @@ public class FileStorageService {
     private static final DateTimeFormatter DIR_DATE   = DateTimeFormatter.ofPattern("yyyy/MM/dd");
     private static final DateTimeFormatter BECS_DATE  = DateTimeFormatter.ofPattern("ddMMyy");
 
-    private final BecsProperties props;
+    private final BecsProperties         props;
+    private final BsbSequenceRepository  sequenceRepo;
 
     /**
      * Write the full debulked BECS DE file (header + all detail records + trailer)
      * as a single file under:
-     *   output/<yyyy>/<MM>/<dd>/<bpyFileName-without-extension>.bpy.001
+     *   output/<yyyy>/<MM>/<dd>/<bsb_number>.bpy.<nnn>
+     *
+     * nnn is the next value (001-999, wrapping back to 001 after 999) of the
+     * per-BSB counter tracked in becs_bsb_sequence.
      *
      * Returns the path of the written file.
      */
@@ -48,8 +54,10 @@ public class FileStorageService {
         Path dateDir = props.output().resolve(LocalDate.now().format(DIR_DATE));
         Files.createDirectories(dateDir);
 
-        String outName = stripExtension(bpyFileName) + ".bpy.001";
-        Path   outPath = dateDir.resolve(outName);
+        String bsbNumber = extractBsbNumber(bpyFileName);
+        int    sequence  = nextSequence(bsbNumber);
+        String outName   = bsbNumber + ".bpy." + String.format("%03d", sequence);
+        Path   outPath   = dateDir.resolve(outName);
 
         try (BufferedWriter w = Files.newBufferedWriter(outPath, StandardCharsets.ISO_8859_1)) {
             if (header != null) {
@@ -162,5 +170,25 @@ public class FileStorageService {
     private String stripExtension(String name) {
         int dot = name.lastIndexOf('.');
         return dot < 0 ? name : name.substring(0, dot);
+    }
+
+    /** Extracts the BSB number from an input file named {bsb_number}.bpy.nnn */
+    private String extractBsbNumber(String bpyFileName) {
+        int idx = bpyFileName.toLowerCase().indexOf(".bpy.");
+        return idx < 0 ? stripExtension(bpyFileName) : bpyFileName.substring(0, idx);
+    }
+
+    /**
+     * Next value (001-999, wrapping back to 001 after 999) of the output
+     * sequence counter for this BSB number, tracked in becs_bsb_sequence.
+     */
+    private int nextSequence(String bsbNumber) {
+        BsbSequence seq = sequenceRepo.findById(bsbNumber)
+                .orElseGet(() -> new BsbSequence(bsbNumber, 0));
+
+        int next = seq.getLastSequence() >= 999 ? 1 : seq.getLastSequence() + 1;
+        seq.setLastSequence(next);
+        sequenceRepo.save(seq);
+        return next;
     }
 }

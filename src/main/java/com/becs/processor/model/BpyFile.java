@@ -39,6 +39,9 @@ public class BpyFile {
     @Column(name = "archived_path", length = 1024)
     private String archivedPath;
 
+    @Column(name = "output_file_path", length = 1024)
+    private String outputFilePath;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
     @Builder.Default
@@ -64,11 +67,13 @@ public class BpyFile {
     @Builder.Default
     private List<PaymentRecord> paymentRecords = new ArrayList<>();
 
-    @OneToOne(mappedBy = "bpyFile", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @OneToMany(mappedBy = "bpyFile", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @ToString.Exclude
-    private FileHeader fileHeader;
+    @Builder.Default
+    private List<FileHeader> fileHeaders = new ArrayList<>();
 
-    @OneToOne(mappedBy = "bpyFile", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @OneToMany(mappedBy = "bpyFile", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @ToString.Exclude
-    private FileTrailer fileTrailer;
+    @Builder.Default
+    private List<FileTrailer> fileTrailers = new ArrayList<>();
 }
