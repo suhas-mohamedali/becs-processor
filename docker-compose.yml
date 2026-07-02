@@ -1,0 +1,63 @@
+version: "3.9"
+
+# ============================================================
+# BECS BPY File Processor – Docker Compose (H2 embedded DB)
+# No external database container needed.
+# The H2 file is stored in a named volume so data persists
+# across container restarts and is accessible via DataGrip.
+# ============================================================
+services:
+
+  becs-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: becs-processor
+    restart: unless-stopped
+    environment:
+      # H2 file path inside the container (mapped to a named volume)
+      BECS_DB_PATH: /data/becsdb
+
+      DB_USERNAME: becs
+      DB_PASSWORD: becs
+
+      # BECS file directories
+      BECS_INBOX_DIR:   /data/becs/inbox
+      BECS_ARCHIVE_DIR: /data/becs/archive
+      BECS_OUTPUT_DIR:  /data/becs/output
+      BECS_ERROR_DIR:   /data/becs/error
+
+      BECS_POLL_MS: 30000
+      SPRING_PROFILES_ACTIVE: docker
+
+    volumes:
+      # H2 database files persist here (mount this locally to open in DataGrip)
+      - becs-db:/data
+      # BECS file directories
+      - becs-inbox:/data/becs/inbox
+      - becs-archive:/data/becs/archive
+      - becs-output:/data/becs/output
+      - becs-error:/data/becs/error
+
+    ports:
+      - "8080:8080"   # REST API + Swagger + H2 Console
+      - "9092:9092"   # H2 TCP server port (for DataGrip remote connection)
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  becs-db:
+    driver: local
+  becs-inbox:
+    driver: local
+  becs-archive:
+    driver: local
+  becs-output:
+    driver: local
+  becs-error:
+    driver: local

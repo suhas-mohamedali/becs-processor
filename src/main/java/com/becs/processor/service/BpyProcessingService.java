@@ -1,0 +1,165 @@
+package com.becs.processor.service;
+
+import com.becs.processor.dto.ParsedBpyFile;
+import com.becs.processor.dto.ParsedPayment;
+import com.becs.processor.model.*;
+import com.becs.processor.parser.BpyFileParser;
+import com.becs.processor.repository.BpyFileRepository;
+import com.becs.processor.repository.PaymentRecordRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * Orchestrates the full debulk pipeline for a single BPY file:
+ *  1. Register the file in the DB
+ *  2. Parse the fixed-width BECS DE content
+ *  3. Group detail records by BSB → one debulked output file per BSB
+ *  4. Persist each PaymentRecord to the DB
+ *  5. Archive the source file
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class BpyProcessingService {
+
+    private final BpyFileParser         parser;
+    private final FileStorageService    fileStorage;
+    private final BpyFileRepository     bpyFileRepo;
+    private final PaymentRecordRepository paymentRepo;
+
+    /**
+     * Process a BPY file found in the inbox directory.
+     *
+     * @param inboxPath full path to the .bpy file
+     */
+    @Transactional
+    public BpyFile process(Path inboxPath) {
+        String fileName = inboxPath.getFileName().toString();
+        log.info("Processing BPY file: {}", fileName);
+
+        // ---- 1. Register / retrieve DB record ----
+        BpyFile bpyFile = bpyFileRepo.findByFileName(fileName).orElseGet(() ->
+                bpyFileRepo.save(BpyFile.builder()
+                        .fileName(fileName)
+                        .filePath(inboxPath.toAbsolutePath().toString())
+                        .fileSizeBytes(safeSize(inboxPath))
+                        .receivedAt(LocalDateTime.now())
+                        .status(BpyFileStatus.RECEIVED)
+                        .build())
+        );
+
+        if (bpyFile.getStatus() == BpyFileStatus.COMPLETED) {
+            log.warn("File {} already processed – skipping", fileName);
+            return bpyFile;
+        }
+
+        bpyFile.setStatus(BpyFileStatus.PROCESSING);
+        bpyFileRepo.save(bpyFile);
+
+        try {
+            // ---- 2. Parse ----
+            ParsedBpyFile parsed = parser.parse(inboxPath);
+
+            // ---- 3. Save header ----
+            if (parsed.getHeader() != null) {
+                FileHeader header = FileHeader.builder()
+                        .bpyFile(bpyFile)
+                        .reelSequenceNumber(parsed.getHeader().getReelSequenceNumber())
+                        .financialInstitution(parsed.getHeader().getFinancialInstitution())
+                        .userPreferredSpec(parsed.getHeader().getUserPreferredSpec())
+                        .userId(parsed.getHeader().getUserId())
+                        .description(parsed.getHeader().getDescription())
+                        .processingDate(parsed.getHeader().getProcessingDate())
+                        .build();
+                bpyFile.setFileHeader(header);
+            }
+
+            // ---- 4. Save trailer ----
+            if (parsed.getTrailer() != null) {
+                FileTrailer trailer = FileTrailer.builder()
+                        .bpyFile(bpyFile)
+                        .bsbFiller(parsed.getTrailer().getBsbFiller())
+                        .netTotalAmount(parsed.getTrailer().getNetTotalAmount())
+                        .creditTotalAmount(parsed.getTrailer().getCreditTotalAmount())
+                        .debitTotalAmount(parsed.getTrailer().getDebitTotalAmount())
+                        .recordCount(parsed.getTrailer().getRecordCount())
+                        .build();
+                bpyFile.setFileTrailer(trailer);
+            }
+
+            // ---- 5. Group payments by BSB and write debulked files ----
+            List<ParsedPayment> payments = parsed.getPayments();
+            Map<String, List<ParsedPayment>> byBsb = payments.stream()
+                    .collect(Collectors.groupingBy(p ->
+                            p.getBsbNumber() == null ? "UNKNOWN" : p.getBsbNumber()));
+
+            List<PaymentRecord> records = new ArrayList<>();
+            for (Map.Entry<String, List<ParsedPayment>> entry : byBsb.entrySet()) {
+                String             bsb     = entry.getKey();
+                List<ParsedPayment> group  = entry.getValue();
+
+                Path outPath = fileStorage.writeDebulkedFile(fileName, bsb, group);
+                String outStr = outPath.toAbsolutePath().toString();
+
+                for (ParsedPayment p : group) {
+                    records.add(PaymentRecord.builder()
+                            .bpyFile(bpyFile)
+                            .bsbNumber(p.getBsbNumber())
+                            .accountNumber(p.getAccountNumber())
+                            .indicator(p.getIndicator())
+                            .transactionCode(p.getTransactionCode())
+                            .amountCents(p.getAmountCents())
+                            .accountName(p.getAccountName())
+                            .lodgementReference(p.getLodgementReference())
+                            .traceBsb(p.getTraceBsb())
+                            .traceAccount(p.getTraceAccount())
+                            .remitterName(p.getRemitterName())
+                            .withholdingTax(p.getWithholdingTax())
+                            .lineNumber(p.getLineNumber())
+                            .recordType(p.getRecordType())
+                            .outputFilePath(outStr)
+                            .status(PaymentStatus.STORED)
+                            .build());
+                }
+            }
+
+            paymentRepo.saveAll(records);
+
+            // ---- 6. Archive source file ----
+            Path archivePath = fileStorage.archiveSourceFile(inboxPath);
+
+            // ---- 7. Mark completed ----
+            bpyFile.setStatus(BpyFileStatus.COMPLETED);
+            bpyFile.setProcessedAt(LocalDateTime.now());
+            bpyFile.setRecordCount(records.size());
+            bpyFile.setArchivedPath(archivePath.toAbsolutePath().toString());
+            bpyFileRepo.save(bpyFile);
+
+            log.info("Completed processing {}: {} payment records across {} BSBs",
+                    fileName, records.size(), byBsb.size());
+
+        } catch (Exception e) {
+            log.error("Failed to process {}: {}", fileName, e.getMessage(), e);
+            bpyFile.setStatus(BpyFileStatus.FAILED);
+            bpyFile.setErrorMessage(e.getMessage());
+            bpyFileRepo.save(bpyFile);
+
+            try { fileStorage.moveToError(inboxPath); }
+            catch (Exception ex) { log.error("Cannot move file to error dir: {}", ex.getMessage()); }
+        }
+
+        return bpyFile;
+    }
+
+    private long safeSize(Path p) {
+        try { return Files.size(p); } catch (Exception e) { return -1L; }
+    }
+}

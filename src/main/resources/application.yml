@@ -1,0 +1,81 @@
+spring:
+  application:
+    name: becs-processor
+
+  # ── Embedded H2 Database ──────────────────────────────────────────
+  datasource:
+    # FILE mode: data survives restarts and can be opened by DataGrip/DBeaver
+    url: jdbc:h2:file:${BECS_DB_PATH:./data/becsdb};AUTO_SERVER=TRUE;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: ${DB_USERNAME:becs}
+    password: ${DB_PASSWORD:becs}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+
+  # ── H2 Web Console (browser access on /h2-console) ───────────────
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: true   # allow access from DataGrip / external tools
+
+  # ── Flyway ───────────────────────────────────────────────────────
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  # ── Spring Batch ─────────────────────────────────────────────────
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
+
+  # ── File Upload ──────────────────────────────────────────────────
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 500MB
+      max-request-size: 500MB
+
+# ── BECS File Processing ─────────────────────────────────────────────
+becs:
+  inbox-dir:   ${BECS_INBOX_DIR:./data/becs/inbox}
+  archive-dir: ${BECS_ARCHIVE_DIR:./data/becs/archive}
+  output-dir:  ${BECS_OUTPUT_DIR:./data/becs/output}
+  error-dir:   ${BECS_ERROR_DIR:./data/becs/error}
+  poll-interval-ms: ${BECS_POLL_MS:30000}
+  chunk-size:       ${BECS_CHUNK_SIZE:100}
+
+# ── Actuator ─────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# ── Swagger ──────────────────────────────────────────────────────────
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.becs: DEBUG
+    org.springframework.batch: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
