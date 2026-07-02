@@ -90,12 +90,12 @@ public class BpyFileParser {
     // ---------------------------------------------------------------
     private ParsedHeader parseHeader(String line, int lineNo) {
         try {
-            String reelSeq      = substring(line, 1, 3).trim();
-            String institution  = substring(line, 3, 6).trim();
-            String userSpec     = substring(line, 6, 32).trim();
-            String userId       = substring(line, 32, 41).trim();
-            String description  = substring(line, 41, 53).trim();
-            String dateStr      = substring(line, 53, 59).trim();
+            String reelSeq      = substring(line, 18, 20).trim();
+            String institution  = substring(line, 20, 23).trim();
+            String userSpec     = substring(line, 23, 30).trim();
+            String userId       = substring(line, 30, 56).trim();
+            String description  = substring(line, 56, 68).trim();
+            String dateStr      = substring(line, 68, 74).trim();
 
             LocalDate processingDate = null;
             if (!dateStr.isBlank()) {
