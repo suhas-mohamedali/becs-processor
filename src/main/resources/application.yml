@@ -28,10 +28,13 @@ spring:
         web-allow-others: true   # allow access from DataGrip / external tools
 
   # ── Flyway ───────────────────────────────────────────────────────
+  # clean-disabled=false lets the FlywayMigrationStrategy below wipe and
+  # rebuild the schema on every startup, so H2 never carries data between runs.
   flyway:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+    clean-disabled: false
 
   # ── Spring Batch ─────────────────────────────────────────────────
   batch:
