@@ -103,14 +103,15 @@ public class FileStorageService {
     private String formatHeaderLine(ParsedHeader h) {
         String dateStr = h.getProcessingDate() == null ? "" : h.getProcessingDate().format(BECS_DATE);
         return "0" +
+               pad("",                          17) + // spare
                pad(h.getReelSequenceNumber(),   2)  +
                pad(h.getFinancialInstitution(), 3)  +
+               pad("",                          7)  + // spare
                pad(h.getUserPreferredSpec(),    26) +
-               pad(h.getUserId(),               9)  +
+               pad(h.getUserId(),               6)  +
                pad(h.getDescription(),          12) +
                pad(dateStr,                     6)  +
-               pad("",                          3)  + // obsolete processing date, spare
-               pad("",                          58);  // spare
+               pad("",                          40);  // spare
     }
 
     // ------------------------------------------------------------------
@@ -120,12 +121,12 @@ public class FileStorageService {
         return "7" +
                pad(t.getBsbFiller(), 7) +
                pad("", 12) + // spare
-               padLeft(String.valueOf(t.getNetTotalAmount()    == null ? 0 : t.getNetTotalAmount()),    9) +
-               padLeft(String.valueOf(t.getCreditTotalAmount() == null ? 0 : t.getCreditTotalAmount()), 9) +
-               padLeft(String.valueOf(t.getDebitTotalAmount()  == null ? 0 : t.getDebitTotalAmount()),  9) +
-               pad("", 4) + // spare
+               padLeft(String.valueOf(t.getNetTotalAmount()    == null ? 0 : t.getNetTotalAmount()),    10) +
+               padLeft(String.valueOf(t.getCreditTotalAmount() == null ? 0 : t.getCreditTotalAmount()), 10) +
+               padLeft(String.valueOf(t.getDebitTotalAmount()  == null ? 0 : t.getDebitTotalAmount()),  10) +
+               pad("", 24) + // spare
                padLeft(String.valueOf(t.getRecordCount() == null ? 0 : t.getRecordCount()), 6) +
-               pad("", 63); // spare
+               pad("", 40); // spare
     }
 
     // ------------------------------------------------------------------
@@ -137,13 +138,13 @@ public class FileStorageService {
                pad(p.getAccountNumber(),    9)  +
                pad(p.getIndicator(),        1)  +
                pad(p.getTransactionCode(),  2)  +
-               padLeft(String.valueOf(p.getAmountCents() == null ? 0 : p.getAmountCents()), 9) +
+               padLeft(String.valueOf(p.getAmountCents() == null ? 0 : p.getAmountCents()), 10) +
                pad(p.getAccountName(),      32) +
                pad(p.getLodgementReference(), 18) +
                pad(p.getTraceBsb(),         7)  +
                pad(p.getTraceAccount(),     9)  +
                pad(p.getRemitterName(),     16) +
-               padLeft(String.valueOf(p.getWithholdingTax() == null ? 0 : p.getWithholdingTax()), 9);
+               padLeft(String.valueOf(p.getWithholdingTax() == null ? 0 : p.getWithholdingTax()), 8);
     }
 
     private String pad(String s, int len) {

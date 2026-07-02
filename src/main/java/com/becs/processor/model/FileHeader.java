@@ -33,7 +33,7 @@ public class FileHeader {
     @Column(name = "user_preferred_spec", length = 26)
     private String userPreferredSpec;
 
-    @Column(name = "user_id", length = 9)
+    @Column(name = "user_id", length = 6)
     private String userId;
 
     @Column(name = "description", length = 12)

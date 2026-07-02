@@ -79,23 +79,24 @@ public class BpyFileParser {
     // ---------------------------------------------------------------
     // Type 0 – File Header (120 chars)
     // Pos  1      : Record type "0"
-    // Pos  2-3    : Reel sequence number
-    // Pos  4-6    : Financial institution
-    // Pos  7-32   : User preferred spec (left-justified, space-filled)
-    // Pos  33-41  : User ID
-    // Pos  42-53  : Description
-    // Pos  54-59  : Processing date (DDMMYY)
-    // Pos  60-62  : Processing date (obsolete – ignore)
-    // Pos  63-120 : Spare
+    // Pos  2-18   : Blank
+    // Pos  19-20  : Reel sequence number
+    // Pos  21-23  : Financial institution
+    // Pos  24-30  : Blank
+    // Pos  31-56  : User preferred spec (left-justified, space-filled)
+    // Pos  57-62  : User ID
+    // Pos  63-74  : Description
+    // Pos  75-80  : Processing date (DDMMYY)
+    // Pos  81-120 : Spare
     // ---------------------------------------------------------------
     private ParsedHeader parseHeader(String line, int lineNo) {
         try {
             String reelSeq      = substring(line, 18, 20).trim();
             String institution  = substring(line, 20, 23).trim();
-            String userSpec     = substring(line, 23, 30).trim();
-            String userId       = substring(line, 30, 56).trim();
-            String description  = substring(line, 56, 68).trim();
-            String dateStr      = substring(line, 68, 74).trim();
+            String userSpec     = substring(line, 30, 56).trim();
+            String userId       = substring(line, 56, 62).trim();
+            String description  = substring(line, 62, 74).trim();
+            String dateStr      = substring(line, 74, 80).trim();
 
             LocalDate processingDate = null;
             if (!dateStr.isBlank()) {
@@ -125,13 +126,13 @@ public class BpyFileParser {
     // Pos  9-17   : Account number
     // Pos  18     : Withholding tax indicator
     // Pos  19-20  : Transaction code
-    // Pos  21-29  : Amount ($$$$$$cc, no decimal, in cents)
-    // Pos  30-61  : Account name (32 chars)
-    // Pos  62-79  : Lodgement reference (18 chars)
-    // Pos  80-86  : Trace BSB
-    // Pos  87-95  : Trace account number
-    // Pos  96-111 : Remitter name (16 chars)
-    // Pos 112-120 : Withholding tax amount (cents)
+    // Pos  21-30  : Amount ($$$$$$$cc, no decimal, in cents)
+    // Pos  31-62  : Account name (32 chars)
+    // Pos  63-80  : Lodgement reference (18 chars)
+    // Pos  81-87  : Trace BSB
+    // Pos  88-96  : Trace account number
+    // Pos  97-112 : Remitter name (16 chars)
+    // Pos 113-120 : Withholding tax amount (cents)
     // ---------------------------------------------------------------
     private ParsedPayment parseDetail(String line, int lineNo) {
         String bsb           = substring(line, 1, 8).trim();
@@ -171,19 +172,19 @@ public class BpyFileParser {
     // Pos  1      : Record type "7"
     // Pos  2-8    : BSB filler "999-999"
     // Pos  9-20   : Spare
-    // Pos  21-29  : Net total amount (cents)
-    // Pos  30-38  : Credit total amount (cents)
-    // Pos  39-47  : Debit total amount (cents)
-    // Pos  48-51  : Spare
-    // Pos  52-57  : Record count
-    // Pos  58-120 : Spare
+    // Pos  21-30  : Net total amount (cents)
+    // Pos  31-40  : Credit total amount (cents)
+    // Pos  41-50  : Debit total amount (cents)
+    // Pos  51-74  : Spare
+    // Pos  75-80  : Record count
+    // Pos  81-120 : Spare
     // ---------------------------------------------------------------
     private ParsedTrailer parseTrailer(String line, int lineNo) {
         String bsbFiller = substring(line, 1, 8).trim();
-        String netStr    = substring(line, 20, 29).trim();
-        String creditStr = substring(line, 29, 38).trim();
-        String debitStr  = substring(line, 38, 47).trim();
-        String countStr  = substring(line, 51, 57).trim();
+        String netStr    = substring(line, 20, 30).trim();
+        String creditStr = substring(line, 30, 40).trim();
+        String debitStr  = substring(line, 40, 50).trim();
+        String countStr  = substring(line, 74, 80).trim();
 
         return ParsedTrailer.builder()
                 .bsbFiller(bsbFiller)

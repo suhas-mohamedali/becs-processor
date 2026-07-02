@@ -58,7 +58,7 @@ CREATE TABLE becs_file_header (
     reel_sequence_number VARCHAR(2),
     financial_institution VARCHAR(3),
     user_preferred_spec  VARCHAR(26),
-    user_id              VARCHAR(9),
+    user_id              VARCHAR(6),
     description          VARCHAR(12),
     processing_date      DATE,
     created_at           TIMESTAMP   NOT NULL DEFAULT NOW()
