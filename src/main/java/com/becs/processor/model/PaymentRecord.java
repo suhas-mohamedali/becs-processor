@@ -30,7 +30,7 @@ public class PaymentRecord {
     @Column(name = "account_number", length = 9)
     private String accountNumber;
 
-    @Column(name = "indicator", length = 1)
+    @Column(name = "indicator", columnDefinition = "CHAR(1)")
     private String indicator;
 
     @Column(name = "transaction_code", length = 2)
@@ -62,7 +62,7 @@ public class PaymentRecord {
     @Column(name = "line_number")
     private Integer lineNumber;
 
-    @Column(name = "record_type", length = 1)
+    @Column(name = "record_type", columnDefinition = "CHAR(1)")
     private String recordType;
 
     @Column(name = "output_file_path", length = 1024)
@@ -73,7 +73,8 @@ public class PaymentRecord {
     @Builder.Default
     private PaymentStatus status = PaymentStatus.PENDING;
 
-    @Column(name = "error_message", columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "error_message")
     private String errorMessage;
 
     @Column(name = "created_at", nullable = false, updatable = false)
