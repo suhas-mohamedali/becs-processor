@@ -138,13 +138,13 @@ public class BpyFileParser {
         String accountNo     = substring(line, 8, 17).trim();
         String indicator     = substring(line, 17, 18).trim();
         String txnCode       = substring(line, 18, 20).trim();
-        String amountStr     = substring(line, 20, 29).trim();
-        String accountName   = substring(line, 29, 61).trim();
-        String lodgementRef  = substring(line, 61, 79).trim();
-        String traceBsb      = substring(line, 79, 86).trim();
-        String traceAccount  = substring(line, 86, 95).trim();
-        String remitterName  = substring(line, 95, 111).trim();
-        String taxStr        = substring(line, 111, 120).trim();
+        String amountStr     = substring(line, 20, 30).trim();
+        String accountName   = substring(line, 30, 62).trim();
+        String lodgementRef  = substring(line, 62, 80).trim();
+        String traceBsb      = substring(line, 80, 87).trim();
+        String traceAccount  = substring(line, 87, 96).trim();
+        String remitterName  = substring(line, 96, 112).trim();
+        String taxStr        = substring(line, 112, 120).trim();
 
         Long amount = parseLong(amountStr, lineNo, "amount");
         Long tax    = parseLong(taxStr,    lineNo, "withholding tax");
