@@ -33,18 +33,18 @@ public class FileStorageService {
 
     /**
      * Write a set of payment records as a debulked BECS DE file under:
-     *   output/<yyyy>/<MM>/<dd>/<bpyFileName>_<bsb>.de
+     *   output/<yyyy>/<MM>/<dd>/<bpyFileName-without-extension>.bpy.<nnn>
      *
+     * nnn is the caller-supplied sequence number (001-999) for this output file.
      * Returns the path of the written file.
      */
     public Path writeDebulkedFile(String bpyFileName,
-                                  String bsb,
+                                  int sequence,
                                   List<ParsedPayment> payments) throws IOException {
         Path dateDir = props.output().resolve(LocalDate.now().format(DIR_DATE));
         Files.createDirectories(dateDir);
 
-        String safeBsb = bsb.replace("-", "");
-        String outName = stripExtension(bpyFileName) + "_" + safeBsb + ".de";
+        String outName = stripExtension(bpyFileName) + ".bpy." + String.format("%03d", sequence);
         Path   outPath = dateDir.resolve(outName);
 
         try (BufferedWriter w = Files.newBufferedWriter(outPath, StandardCharsets.ISO_8859_1)) {

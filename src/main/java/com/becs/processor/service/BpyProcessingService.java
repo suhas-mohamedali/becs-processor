@@ -102,11 +102,11 @@ public class BpyProcessingService {
                             p.getBsbNumber() == null ? "UNKNOWN" : p.getBsbNumber()));
 
             List<PaymentRecord> records = new ArrayList<>();
+            int sequence = 0;
             for (Map.Entry<String, List<ParsedPayment>> entry : byBsb.entrySet()) {
-                String             bsb     = entry.getKey();
-                List<ParsedPayment> group  = entry.getValue();
+                List<ParsedPayment> group = entry.getValue();
 
-                Path outPath = fileStorage.writeDebulkedFile(fileName, bsb, group);
+                Path outPath = fileStorage.writeDebulkedFile(fileName, ++sequence, group);
                 String outStr = outPath.toAbsolutePath().toString();
 
                 for (ParsedPayment p : group) {
