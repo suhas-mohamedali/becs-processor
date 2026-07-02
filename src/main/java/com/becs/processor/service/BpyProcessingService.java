@@ -104,7 +104,8 @@ public class  BpyProcessingService {
             ParsedTrailer lastTrailer = trailers.isEmpty() ? null : parsed.getTrailers().get(parsed.getTrailers().size() - 1);
             Path outPath = fileStorage.writeDebulkedFile(fileName, lastHeader, payments, lastTrailer);
             String outStr = outPath.toAbsolutePath().toString();
-            bpyFile.setOutputFilePath(outStr);
+            bpyFile.setBpyOutputFilePath(outStr);
+            bpyFile.setBpyOutFileName(outPath.getFileName().toString());
 
             List<PaymentRecord> records = new ArrayList<>();
             for (ParsedPayment p : payments) {
@@ -137,6 +138,7 @@ public class  BpyProcessingService {
             bpyFile.setStatus(BpyFileStatus.COMPLETED);
             bpyFile.setProcessedAt(LocalDateTime.now());
             bpyFile.setRecordCount(records.size());
+            bpyFile.setBpyRecordCount(records.size());
             bpyFile.setArchivedPath(archivePath.toAbsolutePath().toString());
             bpyFileRepo.save(bpyFile);
 

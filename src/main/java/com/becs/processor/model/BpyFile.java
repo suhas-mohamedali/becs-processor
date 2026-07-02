@@ -39,8 +39,25 @@ public class BpyFile {
     @Column(name = "archived_path", length = 1024)
     private String archivedPath;
 
-    @Column(name = "output_file_path", length = 1024)
-    private String outputFilePath;
+    // BPY debulked output (produced today)
+    @Column(name = "bpy_out_file_name", length = 512)
+    private String bpyOutFileName;
+
+    @Column(name = "bpy_output_file_path", length = 1024)
+    private String bpyOutputFilePath;
+
+    @Column(name = "bpy_record_count")
+    private Integer bpyRecordCount;
+
+    // RET debulked output (reserved for when an input file splits into two outputs)
+    @Column(name = "ret_out_file_name", length = 512)
+    private String retOutFileName;
+
+    @Column(name = "ret_output_file_path", length = 1024)
+    private String retOutputFilePath;
+
+    @Column(name = "ret_record_count")
+    private Integer retRecordCount;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)

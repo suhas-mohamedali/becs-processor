@@ -13,7 +13,17 @@ CREATE TABLE becs_bpy_file (
     received_at         TIMESTAMP       NOT NULL DEFAULT NOW(),
     processed_at        TIMESTAMP,
     archived_path       VARCHAR(1024),
-    output_file_path    VARCHAR(1024),
+
+    -- BPY debulked output (produced today)
+    bpy_out_file_name   VARCHAR(512),
+    bpy_output_file_path VARCHAR(1024),
+    bpy_record_count    INTEGER,
+
+    -- RET debulked output (reserved for when an input file splits into two outputs)
+    ret_out_file_name   VARCHAR(512),
+    ret_output_file_path VARCHAR(1024),
+    ret_record_count    INTEGER,
+
     status              VARCHAR(50)     NOT NULL DEFAULT 'RECEIVED',
     error_message       CLOB,
     record_count        INTEGER,
