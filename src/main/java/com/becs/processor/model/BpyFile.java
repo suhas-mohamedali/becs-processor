@@ -64,11 +64,11 @@ public class BpyFile {
     @Builder.Default
     private List<PaymentRecord> paymentRecords = new ArrayList<>();
 
-    @OneToOne(mappedBy = "bpyFile", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToOne(mappedBy = "bpyFile", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @ToString.Exclude
     private FileHeader fileHeader;
 
-    @OneToOne(mappedBy = "bpyFile", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToOne(mappedBy = "bpyFile", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @ToString.Exclude
     private FileTrailer fileTrailer;
 }
