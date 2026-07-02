@@ -15,7 +15,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Orchestrates the full debulk pipeline for a single BPY file:
@@ -95,40 +94,32 @@ public class BpyProcessingService {
                 bpyFile.setFileTrailer(trailer);
             }
 
-            // ---- 5. Group payments by BSB and write debulked files ----
+            // ---- 5. Write the debulked file (header + all details + trailer) ----
             List<ParsedPayment> payments = parsed.getPayments();
-            Map<String, List<ParsedPayment>> byBsb = payments.stream()
-                    .collect(Collectors.groupingBy(p ->
-                            p.getBsbNumber() == null ? "UNKNOWN" : p.getBsbNumber()));
+            Path outPath = fileStorage.writeDebulkedFile(
+                    fileName, parsed.getHeader(), payments, parsed.getTrailer());
+            String outStr = outPath.toAbsolutePath().toString();
 
             List<PaymentRecord> records = new ArrayList<>();
-            int sequence = 0;
-            for (Map.Entry<String, List<ParsedPayment>> entry : byBsb.entrySet()) {
-                List<ParsedPayment> group = entry.getValue();
-
-                Path outPath = fileStorage.writeDebulkedFile(fileName, ++sequence, group);
-                String outStr = outPath.toAbsolutePath().toString();
-
-                for (ParsedPayment p : group) {
-                    records.add(PaymentRecord.builder()
-                            .bpyFile(bpyFile)
-                            .bsbNumber(p.getBsbNumber())
-                            .accountNumber(p.getAccountNumber())
-                            .indicator(p.getIndicator())
-                            .transactionCode(p.getTransactionCode())
-                            .amountCents(p.getAmountCents())
-                            .accountName(p.getAccountName())
-                            .lodgementReference(p.getLodgementReference())
-                            .traceBsb(p.getTraceBsb())
-                            .traceAccount(p.getTraceAccount())
-                            .remitterName(p.getRemitterName())
-                            .withholdingTax(p.getWithholdingTax())
-                            .lineNumber(p.getLineNumber())
-                            .recordType(p.getRecordType())
-                            .outputFilePath(outStr)
-                            .status(PaymentStatus.STORED)
-                            .build());
-                }
+            for (ParsedPayment p : payments) {
+                records.add(PaymentRecord.builder()
+                        .bpyFile(bpyFile)
+                        .bsbNumber(p.getBsbNumber())
+                        .accountNumber(p.getAccountNumber())
+                        .indicator(p.getIndicator())
+                        .transactionCode(p.getTransactionCode())
+                        .amountCents(p.getAmountCents())
+                        .accountName(p.getAccountName())
+                        .lodgementReference(p.getLodgementReference())
+                        .traceBsb(p.getTraceBsb())
+                        .traceAccount(p.getTraceAccount())
+                        .remitterName(p.getRemitterName())
+                        .withholdingTax(p.getWithholdingTax())
+                        .lineNumber(p.getLineNumber())
+                        .recordType(p.getRecordType())
+                        .outputFilePath(outStr)
+                        .status(PaymentStatus.STORED)
+                        .build());
             }
 
             paymentRepo.saveAll(records);
@@ -143,8 +134,8 @@ public class BpyProcessingService {
             bpyFile.setArchivedPath(archivePath.toAbsolutePath().toString());
             bpyFileRepo.save(bpyFile);
 
-            log.info("Completed processing {}: {} payment records across {} BSBs",
-                    fileName, records.size(), byBsb.size());
+            log.info("Completed processing {}: {} payment records",
+                    fileName, records.size());
 
         } catch (Exception e) {
             log.error("Failed to process {}: {}", fileName, e.getMessage(), e);

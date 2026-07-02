@@ -1,7 +1,9 @@
 package com.becs.processor.service;
 
 import com.becs.processor.config.BecsProperties;
+import com.becs.processor.dto.ParsedHeader;
 import com.becs.processor.dto.ParsedPayment;
+import com.becs.processor.dto.ParsedTrailer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,29 +29,39 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FileStorageService {
 
-    private static final DateTimeFormatter DIR_DATE = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+    private static final DateTimeFormatter DIR_DATE   = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+    private static final DateTimeFormatter BECS_DATE  = DateTimeFormatter.ofPattern("ddMMyy");
 
     private final BecsProperties props;
 
     /**
-     * Write a set of payment records as a debulked BECS DE file under:
-     *   output/<yyyy>/<MM>/<dd>/<bpyFileName-without-extension>.bpy.<nnn>
+     * Write the full debulked BECS DE file (header + all detail records + trailer)
+     * as a single file under:
+     *   output/<yyyy>/<MM>/<dd>/<bpyFileName-without-extension>.bpy.001
      *
-     * nnn is the caller-supplied sequence number (001-999) for this output file.
      * Returns the path of the written file.
      */
     public Path writeDebulkedFile(String bpyFileName,
-                                  int sequence,
-                                  List<ParsedPayment> payments) throws IOException {
+                                  ParsedHeader header,
+                                  List<ParsedPayment> payments,
+                                  ParsedTrailer trailer) throws IOException {
         Path dateDir = props.output().resolve(LocalDate.now().format(DIR_DATE));
         Files.createDirectories(dateDir);
 
-        String outName = stripExtension(bpyFileName) + ".bpy." + String.format("%03d", sequence);
+        String outName = stripExtension(bpyFileName) + ".bpy.001";
         Path   outPath = dateDir.resolve(outName);
 
         try (BufferedWriter w = Files.newBufferedWriter(outPath, StandardCharsets.ISO_8859_1)) {
+            if (header != null) {
+                w.write(formatHeaderLine(header));
+                w.newLine();
+            }
             for (ParsedPayment p : payments) {
                 w.write(formatDetailLine(p));
+                w.newLine();
+            }
+            if (trailer != null) {
+                w.write(formatTrailerLine(trailer));
                 w.newLine();
             }
         }
@@ -83,6 +95,37 @@ public class FileStorageService {
         Files.move(sourcePath, destination, StandardCopyOption.REPLACE_EXISTING);
         log.warn("Moved failed file to error dir: {}", destination);
         return destination;
+    }
+
+    // ------------------------------------------------------------------
+    // Format the Type-0 BECS DE file header line (120 chars)
+    // ------------------------------------------------------------------
+    private String formatHeaderLine(ParsedHeader h) {
+        String dateStr = h.getProcessingDate() == null ? "" : h.getProcessingDate().format(BECS_DATE);
+        return "0" +
+               pad(h.getReelSequenceNumber(),   2)  +
+               pad(h.getFinancialInstitution(), 3)  +
+               pad(h.getUserPreferredSpec(),    26) +
+               pad(h.getUserId(),               9)  +
+               pad(h.getDescription(),          12) +
+               pad(dateStr,                     6)  +
+               pad("",                          3)  + // obsolete processing date, spare
+               pad("",                          58);  // spare
+    }
+
+    // ------------------------------------------------------------------
+    // Format the Type-7 BECS DE file trailer line (120 chars)
+    // ------------------------------------------------------------------
+    private String formatTrailerLine(ParsedTrailer t) {
+        return "7" +
+               pad(t.getBsbFiller(), 7) +
+               pad("", 12) + // spare
+               padLeft(String.valueOf(t.getNetTotalAmount()    == null ? 0 : t.getNetTotalAmount()),    9) +
+               padLeft(String.valueOf(t.getCreditTotalAmount() == null ? 0 : t.getCreditTotalAmount()), 9) +
+               padLeft(String.valueOf(t.getDebitTotalAmount()  == null ? 0 : t.getDebitTotalAmount()),  9) +
+               pad("", 4) + // spare
+               padLeft(String.valueOf(t.getRecordCount() == null ? 0 : t.getRecordCount()), 6) +
+               pad("", 63); // spare
     }
 
     // ------------------------------------------------------------------
