@@ -20,9 +20,9 @@ public class FileHeader {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "bpy_file_id", nullable = false)
+    @JoinColumn(name = "becs_file_id", nullable = false)
     @ToString.Exclude
-    private BpyFile bpyFile;
+    private BecsFile becsFile;
 
     @Column(name = "reel_sequence_number", length = 2)
     private String reelSequenceNumber;

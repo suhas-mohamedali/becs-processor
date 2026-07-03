@@ -19,9 +19,9 @@ public class FileTrailer {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "bpy_file_id", nullable = false)
+    @JoinColumn(name = "becs_file_id", nullable = false)
     @ToString.Exclude
-    private BpyFile bpyFile;
+    private BecsFile becsFile;
 
     @Column(name = "bsb_filler", length = 7)
     private String bsbFiller;

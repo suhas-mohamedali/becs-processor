@@ -3,6 +3,7 @@ package com.becs.processor.service;
 import com.becs.processor.config.BecsProperties;
 import com.becs.processor.dto.ParsedPayment;
 import com.becs.processor.model.BsbSequence;
+import com.becs.processor.model.FileType;
 import com.becs.processor.repository.BsbSequenceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,29 +40,40 @@ class FileStorageServiceTest {
 
     @Test
     void startsAtOneWhenNoExistingSequence() throws IOException {
-        when(sequenceRepo.findById("12345")).thenReturn(Optional.empty());
+        when(sequenceRepo.findById("12345:BPY")).thenReturn(Optional.empty());
 
-        Path out = fileStorage.writeDebulkedFile("12345.bpy.001", null, List.<ParsedPayment>of(), null);
+        Path out = fileStorage.writeDebulkedFile("12345.bpy.001", FileType.BPY, null, List.<ParsedPayment>of(), null);
 
         assertThat(out.getFileName().toString()).isEqualTo("12345.bpy.001");
-        verify(sequenceRepo).save(argThat(s -> s.getBsbNumber().equals("12345") && s.getLastSequence() == 1));
+        verify(sequenceRepo).save(argThat(s -> s.getSequenceKey().equals("12345:BPY") && s.getLastSequence() == 1));
     }
 
     @Test
     void incrementsFromExistingSequence() throws IOException {
-        when(sequenceRepo.findById("12345")).thenReturn(Optional.of(new BsbSequence("12345", 67)));
+        when(sequenceRepo.findById("12345:BPY")).thenReturn(Optional.of(new BsbSequence("12345:BPY", 67)));
 
-        Path out = fileStorage.writeDebulkedFile("12345.bpy.044", null, List.<ParsedPayment>of(), null);
+        Path out = fileStorage.writeDebulkedFile("12345.bpy.044", FileType.BPY, null, List.<ParsedPayment>of(), null);
 
         assertThat(out.getFileName().toString()).isEqualTo("12345.bpy.068");
     }
 
     @Test
     void wrapsBackToOneAfter999() throws IOException {
-        when(sequenceRepo.findById("12345")).thenReturn(Optional.of(new BsbSequence("12345", 999)));
+        when(sequenceRepo.findById("12345:BPY")).thenReturn(Optional.of(new BsbSequence("12345:BPY", 999)));
 
-        Path out = fileStorage.writeDebulkedFile("12345.bpy.500", null, List.<ParsedPayment>of(), null);
+        Path out = fileStorage.writeDebulkedFile("12345.bpy.500", FileType.BPY, null, List.<ParsedPayment>of(), null);
 
         assertThat(out.getFileName().toString()).isEqualTo("12345.bpy.001");
+    }
+
+    @Test
+    void retAndBpyCountersAreIndependentForTheSameBsb() throws IOException {
+        when(sequenceRepo.findById("12345:RET")).thenReturn(Optional.of(new BsbSequence("12345:RET", 5)));
+
+        Path out = fileStorage.writeDebulkedFile("12345.ret.511", FileType.RET, null, List.<ParsedPayment>of(), null);
+
+        // A BPY counter of 67 elsewhere must not affect this RET-specific bucket.
+        assertThat(out.getFileName().toString()).isEqualTo("12345.ret.006");
+        verify(sequenceRepo, never()).findById("12345:BPY");
     }
 }

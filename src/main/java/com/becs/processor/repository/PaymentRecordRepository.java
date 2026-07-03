@@ -10,14 +10,14 @@ import java.util.List;
 @Repository
 public interface PaymentRecordRepository extends JpaRepository<PaymentRecord, Long> {
 
-    List<PaymentRecord> findByBpyFileId(Long bpyFileId);
+    List<PaymentRecord> findByBecsFileId(Long becsFileId);
 
-    @Query("SELECT COUNT(p) FROM PaymentRecord p WHERE p.bpyFile.id = :fileId")
-    long countByBpyFileId(Long fileId);
+    @Query("SELECT COUNT(p) FROM PaymentRecord p WHERE p.becsFile.id = :fileId")
+    long countByBecsFileId(Long fileId);
 
-    @Query("SELECT SUM(p.amountCents) FROM PaymentRecord p WHERE p.bpyFile.id = :fileId AND p.transactionCode IN ('50','51','52','53','54','55')")
+    @Query("SELECT SUM(p.amountCents) FROM PaymentRecord p WHERE p.becsFile.id = :fileId AND p.transactionCode IN ('50','51','52','53','54','55')")
     Long sumCreditsByFileId(Long fileId);
 
-    @Query("SELECT SUM(p.amountCents) FROM PaymentRecord p WHERE p.bpyFile.id = :fileId AND p.transactionCode = '13'")
+    @Query("SELECT SUM(p.amountCents) FROM PaymentRecord p WHERE p.becsFile.id = :fileId AND p.transactionCode = '13'")
     Long sumDebitsByFileId(Long fileId);
 }

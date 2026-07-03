@@ -1,9 +1,10 @@
 package com.becs.processor.parser;
 
-import com.becs.processor.dto.ParsedBpyFile;
+import com.becs.processor.dto.ParsedBecsFile;
 import com.becs.processor.dto.ParsedHeader;
 import com.becs.processor.dto.ParsedPayment;
 import com.becs.processor.dto.ParsedTrailer;
+import com.becs.processor.model.FileType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -18,48 +19,58 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Parses a BECS Direct Entry (DE) BPY file.
+ * Parses a BECS Direct Entry (DE) file. BPY (payment), RET (return) and NDE
+ * bundles all share the same 120-char record layouts; they differ only in
+ * framing:
+ *  - BPY/RET: one record per line, preceded by a service/preamble line
+ *    (always skipped) and optionally a title line.
+ *  - NDE: no preamble; records are concatenated as 120-char blocks on a
+ *    single line, padded out with all-'9' filler blocks, followed by an
+ *    "End-Of-File" text line.
  *
- * Record layout (120 chars per line):
- *  Type 0 – File Header
- *  Type 1 – Detail record (one payment)
- *  Type 7 – File Control (trailer)
+ * Record types:
+ *  Type 0    – File Header
+ *  Type 1    – Detail record (payment)
+ *  Type 2, 3 – Detail record (return)
+ *  Type 7    – File Control (trailer)
+ *  Type 9    – All-'9' filler block (NDE padding, ignored)
  *
  * Field positions follow the APCA/BECS DE standard.
  */
 @Slf4j
 @Component
-public class BpyFileParser {
+public class BecsFileParser {
 
     private static final DateTimeFormatter BECS_DATE = DateTimeFormatter.ofPattern("ddMMyy");
+    private static final String END_OF_FILE_MARKER   = "End-Of-File";
 
-    public ParsedBpyFile parse(Path filePath) throws IOException {
+    public ParsedBecsFile parse(Path filePath, FileType fileType) throws IOException {
         List<ParsedPayment> payments = new ArrayList<>();
         List<ParsedHeader>  headers  = new ArrayList<>();
         List<ParsedTrailer> trailers = new ArrayList<>();
 
-        try (BufferedReader reader = Files.newBufferedReader(filePath, StandardCharsets.ISO_8859_1)) {
-            reader.readLine(); // always skip the first line of the file
+        List<String> records = fileType == FileType.NDE
+                ? readNdeRecords(filePath)
+                : readLineRecords(filePath);
 
-            String line;
-            int lineNo = 1;
+        int recordNo = fileType == FileType.NDE ? 0 : 1; // line-based formats skip the preamble line
 
-            while ((line = reader.readLine()) != null) {
-                lineNo++;
+        for (String record : records) {
+            recordNo++;
 
-                // Pad or trim to 120 chars
-                if (line.length() < 120) {
-                    line = String.format("%-120s", line);
-                }
+            // Pad or trim to 120 chars
+            if (record.length() < 120) {
+                record = String.format("%-120s", record);
+            }
 
-                char type = line.charAt(0);
+            char type = record.charAt(0);
 
-                switch (type) {
-                    case '0' -> { ParsedHeader h = parseHeader(line, lineNo); if (h != null) headers.add(h); }
-                    case '1' -> payments.add(parseDetail(line, lineNo));
-                    case '7' -> trailers.add(parseTrailer(line, lineNo));
-                    default  -> log.warn("Unknown record type '{}' at line {}", type, lineNo);
-                }
+            switch (type) {
+                case '0' -> { ParsedHeader h = parseHeader(record, recordNo); if (h != null) headers.add(h); }
+                case '1', '2', '3' -> payments.add(parseDetail(record, recordNo, type));
+                case '7' -> trailers.add(parseTrailer(record, recordNo));
+                case '9' -> { /* NDE all-'9' filler block — ignore */ }
+                default  -> log.warn("Unknown record type '{}' at record {}", type, recordNo);
             }
         }
 
@@ -69,11 +80,43 @@ public class BpyFileParser {
                 payments.size(),
                 trailers.size());
 
-        return ParsedBpyFile.builder()
+        return ParsedBecsFile.builder()
                 .headers(headers)
                 .payments(payments)
                 .trailers(trailers)
                 .build();
+    }
+
+    /** BPY/RET framing: one record per line, always skipping the first (preamble) line. */
+    private List<String> readLineRecords(Path filePath) throws IOException {
+        List<String> records = new ArrayList<>();
+        try (BufferedReader reader = Files.newBufferedReader(filePath, StandardCharsets.ISO_8859_1)) {
+            reader.readLine(); // always skip the first line of the file
+            String line;
+            while ((line = reader.readLine()) != null) {
+                records.add(line);
+            }
+        }
+        return records;
+    }
+
+    /**
+     * NDE framing: records are concatenated as 120-char blocks with no line
+     * separators. Blank lines and the trailing "End-Of-File" marker are
+     * skipped; all-'9' filler blocks are passed through as type-9 records
+     * and dropped by the dispatch loop.
+     */
+    private List<String> readNdeRecords(Path filePath) throws IOException {
+        List<String> records = new ArrayList<>();
+        for (String line : Files.readAllLines(filePath, StandardCharsets.ISO_8859_1)) {
+            if (line.isBlank() || line.strip().equalsIgnoreCase(END_OF_FILE_MARKER)) {
+                continue;
+            }
+            for (int offset = 0; offset < line.length(); offset += 120) {
+                records.add(line.substring(offset, Math.min(offset + 120, line.length())));
+            }
+        }
+        return records;
     }
 
     // ---------------------------------------------------------------
@@ -120,8 +163,10 @@ public class BpyFileParser {
     }
 
     // ---------------------------------------------------------------
-    // Type 1 – Detail Record (120 chars)
-    // Pos  1      : Record type "1"
+    // Type 1/2/3 – Detail Record (120 chars). Type 1 is a payment (BPY
+    // files), types 2 and 3 are returns (RET files); all share this exact
+    // field layout.
+    // Pos  1      : Record type "1", "2" or "3"
     // Pos  2-8    : BSB (NNN-NNN)
     // Pos  9-17   : Account number
     // Pos  18     : Withholding tax indicator
@@ -134,7 +179,7 @@ public class BpyFileParser {
     // Pos  97-112 : Remitter name (16 chars)
     // Pos 113-120 : Withholding tax amount (cents)
     // ---------------------------------------------------------------
-    private ParsedPayment parseDetail(String line, int lineNo) {
+    private ParsedPayment parseDetail(String line, int lineNo, char type) {
         String bsb           = substring(line, 1, 8).trim();
         String accountNo     = substring(line, 8, 17).trim();
         String indicator     = substring(line, 17, 18).trim();
@@ -163,7 +208,7 @@ public class BpyFileParser {
                 .remitterName(remitterName)
                 .withholdingTax(tax)
                 .lineNumber(lineNo)
-                .recordType("1")
+                .recordType(String.valueOf(type))
                 .build();
     }
 

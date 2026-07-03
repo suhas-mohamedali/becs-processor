@@ -19,9 +19,9 @@ public class PaymentRecord {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "bpy_file_id", nullable = false)
+    @JoinColumn(name = "becs_file_id", nullable = false)
     @ToString.Exclude
-    private BpyFile bpyFile;
+    private BecsFile becsFile;
 
     // ---- BECS DE Standard Fields ----
     @Column(name = "bsb_number", length = 7)

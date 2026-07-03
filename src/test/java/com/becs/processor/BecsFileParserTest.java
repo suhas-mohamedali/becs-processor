@@ -1,7 +1,8 @@
 package com.becs.processor;
 
-import com.becs.processor.dto.ParsedBpyFile;
-import com.becs.processor.parser.BpyFileParser;
+import com.becs.processor.dto.ParsedBecsFile;
+import com.becs.processor.model.FileType;
+import com.becs.processor.parser.BecsFileParser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -13,9 +14,9 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
 
-class BpyFileParserTest {
+class BecsFileParserTest {
 
-    private final BpyFileParser parser = new BpyFileParser();
+    private final BecsFileParser parser = new BecsFileParser();
 
     @TempDir
     Path tempDir;
@@ -62,7 +63,7 @@ class BpyFileParserTest {
     @Test
     void parsesHeaderCorrectly() throws IOException {
         Path bpy = writeFile(SAMPLE_LINES);
-        ParsedBpyFile result = parser.parse(bpy);
+        ParsedBecsFile result = parser.parse(bpy, FileType.BPY);
 
         assertThat(result.getHeaders()).hasSize(1);
         assertThat(result.getHeaders().get(0).getFinancialInstitution()).isEqualTo("ANZ");
@@ -72,7 +73,7 @@ class BpyFileParserTest {
     @Test
     void parsesDetailRecords() throws IOException {
         Path bpy = writeFile(SAMPLE_LINES);
-        ParsedBpyFile result = parser.parse(bpy);
+        ParsedBecsFile result = parser.parse(bpy, FileType.BPY);
 
         assertThat(result.getPayments()).hasSize(2);
         assertThat(result.getPayments().get(0).getTransactionCode()).isEqualTo("50");
@@ -84,7 +85,7 @@ class BpyFileParserTest {
     @Test
     void parsesTrailerRecordCount() throws IOException {
         Path bpy = writeFile(SAMPLE_LINES);
-        ParsedBpyFile result = parser.parse(bpy);
+        ParsedBecsFile result = parser.parse(bpy, FileType.BPY);
 
         assertThat(result.getTrailers()).hasSize(1);
         assertThat(result.getTrailers().get(0).getRecordCount()).isEqualTo(2);
@@ -93,7 +94,7 @@ class BpyFileParserTest {
     @Test
     void skipsFirstLineOfFile() throws IOException {
         Path bpy = writeFile(SAMPLE_LINES);
-        ParsedBpyFile result = parser.parse(bpy);
+        ParsedBecsFile result = parser.parse(bpy, FileType.BPY);
 
         // PREAMBLE would parse as an unknown record type if it weren't skipped;
         // the header must still be the one at index 1, not misread from PREAMBLE.
@@ -111,7 +112,7 @@ class BpyFileParserTest {
                 header("CBA", "099000"), DETAIL_DEBIT, trailer(1)
         );
         Path bpy = writeFile(multiReelLines);
-        ParsedBpyFile result = parser.parse(bpy);
+        ParsedBecsFile result = parser.parse(bpy, FileType.BPY);
 
         assertThat(result.getHeaders()).hasSize(2);
         assertThat(result.getHeaders().get(0).getFinancialInstitution()).isEqualTo("ANZ");
@@ -123,9 +124,60 @@ class BpyFileParserTest {
     }
 
     @Test
+    void parsesReturnDetailRecordsAsType2() throws IOException {
+        assertParsesReturnDetailAs('2');
+    }
+
+    @Test
+    void parsesReturnDetailRecordsAsType3() throws IOException {
+        assertParsesReturnDetailAs('3');
+    }
+
+    private void assertParsesReturnDetailAs(char recordType) throws IOException {
+        // RET files reuse the exact same 120-char detail layout as BPY files,
+        // just with record type '2' or '3' instead of '1'.
+        String returnDetail =
+                recordType + field("062-001", 7) + field("123456789", 9) + field("6", 1) + field("50", 2)
+                    + amount(10600) + field("SUMIT DONOTTOUCH", 32) + field("", 18)
+                    + field("671-998", 7) + field("104081498", 9) + field("CBA", 16) + amount8(30000112);
+
+        List<String> lines = List.of(PREAMBLE, "RETURNS", HEADER, returnDetail, trailer(1));
+        Path ret = writeFile(lines);
+        ParsedBecsFile result = parser.parse(ret, FileType.RET);
+
+        assertThat(result.getPayments()).hasSize(1);
+        assertThat(result.getPayments().get(0).getRecordType()).isEqualTo(String.valueOf(recordType));
+        assertThat(result.getPayments().get(0).getAccountName().trim()).isEqualTo("SUMIT DONOTTOUCH");
+    }
+
+    @Test
+    void parsesNdeFilesAsConcatenatedBlocks() throws IOException {
+        // NDE files have no preamble line; records are concatenated as
+        // 120-char blocks on a single line, padded with all-'9' filler
+        // blocks and followed by an End-Of-File marker line.
+        String blocks = header("CRU", "000155")
+                + DETAIL_CREDIT
+                + trailer(1)
+                + header("CRU", "000155")
+                + DETAIL_DEBIT
+                + trailer(1)
+                + "9".repeat(240);
+        List<String> lines = List.of(blocks, "", "End-Of-File");
+        Path nde = writeFile(lines);
+        ParsedBecsFile result = parser.parse(nde, FileType.NDE);
+
+        assertThat(result.getHeaders()).hasSize(2);
+        assertThat(result.getHeaders().get(0).getFinancialInstitution()).isEqualTo("CRU");
+        assertThat(result.getHeaders().get(0).getUserId()).isEqualTo("000155");
+        assertThat(result.getPayments()).hasSize(2);
+        assertThat(result.getTrailers()).hasSize(2);
+        assertThat(result.getTrailers().get(0).getRecordCount()).isEqualTo(1);
+    }
+
+    @Test
     void handlesEmptyFile() throws IOException {
         Path bpy = writeFile(List.of());
-        ParsedBpyFile result = parser.parse(bpy);
+        ParsedBecsFile result = parser.parse(bpy, FileType.BPY);
 
         assertThat(result.getPayments()).isEmpty();
         assertThat(result.getHeaders()).isEmpty();

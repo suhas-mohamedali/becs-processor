@@ -19,8 +19,11 @@ public class BecsProperties {
     private long   pollIntervalMs = 30_000L;
     private int    chunkSize      = 100;
 
-    public Path inbox()   { return Paths.get(inboxDir); }
-    public Path archive() { return Paths.get(archiveDir); }
-    public Path output()  { return Paths.get(outputDir); }
-    public Path error()   { return Paths.get(errorDir); }
+    public Path inbox()    { return Paths.get(inboxDir); }
+    public Path inboxBpy() { return inbox().resolve("bpy"); }
+    public Path inboxRet() { return inbox().resolve("ret"); }
+    public Path inboxNde() { return inbox().resolve("nde"); }
+    public Path archive()  { return Paths.get(archiveDir); }
+    public Path output()   { return Paths.get(outputDir); }
+    public Path error()    { return Paths.get(errorDir); }
 }

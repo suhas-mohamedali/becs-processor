@@ -18,13 +18,15 @@ public class DirectoryInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) throws IOException {
-        createIfMissing(props.inbox());
+        createIfMissing(props.inboxBpy());
+        createIfMissing(props.inboxRet());
+        createIfMissing(props.inboxNde());
         createIfMissing(props.archive());
         createIfMissing(props.output());
         createIfMissing(props.error());
-        log.info("BECS directories ready: inbox={}, archive={}, output={}, error={}",
-                props.getInboxDir(), props.getArchiveDir(),
-                props.getOutputDir(), props.getErrorDir());
+        log.info("BECS directories ready: inbox/bpy={}, inbox/ret={}, inbox/nde={}, archive={}, output={}, error={}",
+                props.inboxBpy(), props.inboxRet(), props.inboxNde(),
+                props.getArchiveDir(), props.getOutputDir(), props.getErrorDir());
     }
 
     private void createIfMissing(java.nio.file.Path path) throws IOException {

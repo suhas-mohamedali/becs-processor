@@ -6,7 +6,7 @@ import lombok.Data;
 import java.util.List;
 
 @Data @Builder
-public class ParsedBpyFile {
+public class ParsedBecsFile {
     private List<ParsedHeader>  headers;
     private List<ParsedPayment> payments;
     private List<ParsedTrailer> trailers;

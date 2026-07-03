@@ -9,13 +9,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "becs_bpy_file")
+@Table(name = "becs_file")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(of = "id")
-public class BpyFile {
+public class BecsFile {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -39,7 +39,12 @@ public class BpyFile {
     @Column(name = "archived_path", length = 1024)
     private String archivedPath;
 
-    // BPY debulked output (produced today)
+    /** Whether this input file was a BPY (payment), RET (return) or NDE bundle. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "file_type", nullable = false, length = 10)
+    private FileType fileType;
+
+    // BPY debulked output
     @Column(name = "bpy_out_file_name", length = 512)
     private String bpyOutFileName;
 
@@ -49,7 +54,7 @@ public class BpyFile {
     @Column(name = "bpy_record_count")
     private Integer bpyRecordCount;
 
-    // RET debulked output (reserved for when an input file splits into two outputs)
+    // RET debulked output
     @Column(name = "ret_out_file_name", length = 512)
     private String retOutFileName;
 
@@ -59,10 +64,20 @@ public class BpyFile {
     @Column(name = "ret_record_count")
     private Integer retRecordCount;
 
+    // NDE debulked output
+    @Column(name = "nde_out_file_name", length = 512)
+    private String ndeOutFileName;
+
+    @Column(name = "nde_output_file_path", length = 1024)
+    private String ndeOutputFilePath;
+
+    @Column(name = "nde_record_count")
+    private Integer ndeRecordCount;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
     @Builder.Default
-    private BpyFileStatus status = BpyFileStatus.RECEIVED;
+    private BecsFileStatus status = BecsFileStatus.RECEIVED;
 
     @Lob
     @Column(name = "error_message")
@@ -79,17 +94,17 @@ public class BpyFile {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "bpyFile", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "becsFile", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @ToString.Exclude
     @Builder.Default
     private List<PaymentRecord> paymentRecords = new ArrayList<>();
 
-    @OneToMany(mappedBy = "bpyFile", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @OneToMany(mappedBy = "becsFile", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @ToString.Exclude
     @Builder.Default
     private List<FileHeader> fileHeaders = new ArrayList<>();
 
-    @OneToMany(mappedBy = "bpyFile", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @OneToMany(mappedBy = "becsFile", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @ToString.Exclude
     @Builder.Default
     private List<FileTrailer> fileTrailers = new ArrayList<>();

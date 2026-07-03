@@ -5,6 +5,7 @@ import com.becs.processor.dto.ParsedHeader;
 import com.becs.processor.dto.ParsedPayment;
 import com.becs.processor.dto.ParsedTrailer;
 import com.becs.processor.model.BsbSequence;
+import com.becs.processor.model.FileType;
 import com.becs.processor.repository.BsbSequenceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,23 +41,26 @@ public class FileStorageService {
     /**
      * Write the full debulked BECS DE file (header + all detail records + trailer)
      * as a single file under:
-     *   output/<yyyy>/<MM>/<dd>/<bsb_number>.bpy.<nnn>
+     *   output/<yyyy>/<MM>/<dd>/<bsb_number>.<bpy|ret>.<nnn>
      *
      * nnn is the next value (001-999, wrapping back to 001 after 999) of the
-     * per-BSB counter tracked in becs_bsb_sequence.
+     * per-BSB, per-file-type counter tracked in becs_bsb_sequence.
      *
+     * @param fileType BPY or RET — determines the output extension and
+     *                 which sequence counter bucket is used.
      * Returns the path of the written file.
      */
-    public Path writeDebulkedFile(String bpyFileName,
+    public Path writeDebulkedFile(String inputFileName,
+                                  FileType fileType,
                                   ParsedHeader header,
                                   List<ParsedPayment> payments,
                                   ParsedTrailer trailer) throws IOException {
         Path dateDir = props.output().resolve(LocalDate.now().format(DIR_DATE));
         Files.createDirectories(dateDir);
 
-        String bsbNumber = extractBsbNumber(bpyFileName);
-        int    sequence  = nextSequence(bsbNumber);
-        String outName   = bsbNumber + ".bpy." + String.format("%03d", sequence);
+        String bsbNumber = extractBsbNumber(inputFileName);
+        int    sequence  = nextSequence(bsbNumber, fileType);
+        String outName   = bsbNumber + "." + fileType.name().toLowerCase() + "." + String.format("%03d", sequence);
         Path   outPath   = dateDir.resolve(outName);
 
         try (BufferedWriter w = Files.newBufferedWriter(outPath, StandardCharsets.ISO_8859_1)) {
@@ -141,7 +145,7 @@ public class FileStorageService {
     // Format a single Type-1 BECS DE detail line (120 chars)
     // ------------------------------------------------------------------
     private String formatDetailLine(ParsedPayment p) {
-        return "1" +
+        return p.getRecordType() +
                pad(p.getBsbNumber(),        7)  +
                pad(p.getAccountNumber(),    9)  +
                pad(p.getIndicator(),        1)  +
@@ -167,24 +171,21 @@ public class FileStorageService {
         return String.format("%" + len + "s", s).replace(' ', '0');
     }
 
-    private String stripExtension(String name) {
-        int dot = name.lastIndexOf('.');
-        return dot < 0 ? name : name.substring(0, dot);
-    }
-
-    /** Extracts the BSB number from an input file named {bsb_number}.bpy.nnn */
-    private String extractBsbNumber(String bpyFileName) {
-        int idx = bpyFileName.toLowerCase().indexOf(".bpy.");
-        return idx < 0 ? stripExtension(bpyFileName) : bpyFileName.substring(0, idx);
+    /** Extracts the BSB number from an input file named {bsb_number}.<bpy|ret>.nnn */
+    private String extractBsbNumber(String inputFileName) {
+        int dot = inputFileName.indexOf('.');
+        return dot < 0 ? inputFileName : inputFileName.substring(0, dot);
     }
 
     /**
      * Next value (001-999, wrapping back to 001 after 999) of the output
-     * sequence counter for this BSB number, tracked in becs_bsb_sequence.
+     * sequence counter for this BSB number + file type, tracked in
+     * becs_bsb_sequence.
      */
-    private int nextSequence(String bsbNumber) {
-        BsbSequence seq = sequenceRepo.findById(bsbNumber)
-                .orElseGet(() -> new BsbSequence(bsbNumber, 0));
+    private int nextSequence(String bsbNumber, FileType fileType) {
+        String key = bsbNumber + ":" + fileType.name();
+        BsbSequence seq = sequenceRepo.findById(key)
+                .orElseGet(() -> new BsbSequence(key, 0));
 
         int next = seq.getLastSequence() >= 999 ? 1 : seq.getLastSequence() + 1;
         seq.setLastSequence(next);

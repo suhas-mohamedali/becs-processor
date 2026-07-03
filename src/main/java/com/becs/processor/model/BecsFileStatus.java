@@ -1,6 +1,6 @@
 package com.becs.processor.model;
 
-public enum BpyFileStatus {
+public enum BecsFileStatus {
     RECEIVED,
     PROCESSING,
     COMPLETED,
