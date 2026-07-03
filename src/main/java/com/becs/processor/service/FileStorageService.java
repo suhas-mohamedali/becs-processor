@@ -40,14 +40,14 @@ public class FileStorageService {
 
     /**
      * Write the full debulked BECS DE file (header + all detail records + trailer)
-     * as a single file under:
-     *   output/<yyyy>/<MM>/<dd>/<bsb_number>.<bpy|ret>.<nnn>
+     * as a single file under (mirroring the inbox tree, one subfolder per type):
+     *   output/<bpy|ret|nde>/<yyyy>/<MM>/<dd>/<bsb_number>.<bpy|ret|nde>.<nnn>
      *
      * nnn is the next value (001-999, wrapping back to 001 after 999) of the
      * per-BSB, per-file-type counter tracked in becs_bsb_sequence.
      *
-     * @param fileType BPY or RET — determines the output extension and
-     *                 which sequence counter bucket is used.
+     * @param fileType BPY, RET or NDE — determines the output subfolder,
+     *                 extension, and which sequence counter bucket is used.
      * Returns the path of the written file.
      */
     public Path writeDebulkedFile(String inputFileName,
@@ -55,7 +55,9 @@ public class FileStorageService {
                                   ParsedHeader header,
                                   List<ParsedPayment> payments,
                                   ParsedTrailer trailer) throws IOException {
-        Path dateDir = props.output().resolve(LocalDate.now().format(DIR_DATE));
+        Path dateDir = props.output()
+                .resolve(typeFolder(fileType))
+                .resolve(LocalDate.now().format(DIR_DATE));
         Files.createDirectories(dateDir);
 
         String bsbNumber = extractBsbNumber(inputFileName);
@@ -83,17 +85,24 @@ public class FileStorageService {
     }
 
     /**
-     * Move the original BPY file to the archive directory once processing completes.
-     * Returns the archive path.
+     * Move the original source file to the archive directory once processing
+     * completes, under archive/<bpy|ret|nde>/<yyyy>/<MM>/<dd>/ mirroring the
+     * inbox tree. Returns the archive path.
      */
-    public Path archiveSourceFile(Path sourcePath) throws IOException {
-        Path dateDir = props.archive().resolve(LocalDate.now().format(DIR_DATE));
+    public Path archiveSourceFile(Path sourcePath, FileType fileType) throws IOException {
+        Path dateDir = props.archive()
+                .resolve(typeFolder(fileType))
+                .resolve(LocalDate.now().format(DIR_DATE));
         Files.createDirectories(dateDir);
 
         Path destination = dateDir.resolve(sourcePath.getFileName());
         Files.move(sourcePath, destination, StandardCopyOption.REPLACE_EXISTING);
         log.info("Archived source file: {} → {}", sourcePath, destination);
         return destination;
+    }
+
+    private String typeFolder(FileType fileType) {
+        return fileType.name().toLowerCase();
     }
 
     /**

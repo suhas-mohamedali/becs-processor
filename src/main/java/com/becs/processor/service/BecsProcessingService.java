@@ -142,7 +142,7 @@ public class  BecsProcessingService {
             paymentRepo.saveAll(records);
 
             // ---- 6. Archive source file ----
-            Path archivePath = fileStorage.archiveSourceFile(inboxPath);
+            Path archivePath = fileStorage.archiveSourceFile(inboxPath, fileType);
 
             // ---- 7. Mark completed ----
             becsFile.setStatus(BecsFileStatus.COMPLETED);

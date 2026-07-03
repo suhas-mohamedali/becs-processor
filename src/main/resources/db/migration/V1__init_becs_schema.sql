@@ -89,6 +89,9 @@ CREATE TABLE becs_payment_record (
     record_type         CHAR(1),
     output_file_path    VARCHAR(1024),
     status              VARCHAR(50)     NOT NULL DEFAULT 'PENDING',
+    -- Fraud-check response from the external PRM web service (future
+    -- integration): 'A', 'D', 'N', 'T', or empty/null when not yet recorded
+    prm_status          CHAR(1),
     error_message       CLOB,
     created_at          TIMESTAMP       NOT NULL DEFAULT NOW()
 );

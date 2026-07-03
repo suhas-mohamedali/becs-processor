@@ -85,6 +85,14 @@ public class PaymentRecord {
     @Builder.Default
     private PaymentStatus status = PaymentStatus.PENDING;
 
+    /**
+     * Fraud-check response from the external PRM web service (populated in a
+     * future integration): 'A', 'D', 'N', 'T', or empty/null when no response
+     * has been recorded.
+     */
+    @Column(name = "prm_status", columnDefinition = "CHAR(1)")
+    private String prmStatus;
+
     @Lob
     @Column(name = "error_message")
     private String errorMessage;
