@@ -23,6 +23,18 @@ public class PaymentRecord {
     @ToString.Exclude
     private BecsFile becsFile;
 
+    /** The reel header this payment record sits under in the source file. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "header_id")
+    @ToString.Exclude
+    private FileHeader fileHeader;
+
+    /** The reel trailer this payment record sits under in the source file. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "trailer_id")
+    @ToString.Exclude
+    private FileTrailer fileTrailer;
+
     // ---- BECS DE Standard Fields ----
     @Column(name = "bsb_number", length = 7)
     private String bsbNumber;

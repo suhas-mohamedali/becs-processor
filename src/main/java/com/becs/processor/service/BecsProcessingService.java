@@ -13,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -53,7 +52,6 @@ public class  BecsProcessingService {
                 becsFileRepo.save(BecsFile.builder()
                         .fileName(fileName)
                         .filePath(inboxPath.toAbsolutePath().toString())
-                        .fileSizeBytes(safeSize(inboxPath))
                         .receivedAt(LocalDateTime.now())
                         .fileType(fileType)
                         .status(BecsFileStatus.RECEIVED)
@@ -101,6 +99,9 @@ public class  BecsProcessingService {
             }
             becsFile.setFileTrailers(trailers);
 
+            // Persist headers/trailers now so payment records can reference them
+            becsFileRepo.save(becsFile);
+
             // ---- 5. Write the debulked file (last header + all details + last trailer) ----
             List<ParsedPayment> payments = parsed.getPayments();
             ParsedHeader  lastHeader  = headers.isEmpty()  ? null : parsed.getHeaders().get(parsed.getHeaders().size() - 1);
@@ -118,6 +119,8 @@ public class  BecsProcessingService {
             for (ParsedPayment p : payments) {
                 records.add(PaymentRecord.builder()
                         .becsFile(becsFile)
+                        .fileHeader(headerForPayment(p, parsed.getHeaders(), headers))
+                        .fileTrailer(trailerForPayment(p, parsed.getTrailers(), trailers))
                         .bsbNumber(p.getBsbNumber())
                         .accountNumber(p.getAccountNumber())
                         .indicator(p.getIndicator())
@@ -169,7 +172,34 @@ public class  BecsProcessingService {
         return becsFile;
     }
 
-    private long safeSize(Path p) {
-        try { return Files.size(p); } catch (Exception e) { return -1L; }
+    /**
+     * The reel header a payment sits under: the last header that appears
+     * before the payment in the source file (matched by record position).
+     */
+    private FileHeader headerForPayment(ParsedPayment p,
+                                        List<ParsedHeader> parsedHeaders,
+                                        List<FileHeader> headers) {
+        FileHeader match = null;
+        for (int i = 0; i < parsedHeaders.size(); i++) {
+            if (parsedHeaders.get(i).getLineNumber() < p.getLineNumber()) {
+                match = headers.get(i);
+            }
+        }
+        return match;
+    }
+
+    /**
+     * The reel trailer a payment sits under: the first trailer that appears
+     * after the payment in the source file (matched by record position).
+     */
+    private FileTrailer trailerForPayment(ParsedPayment p,
+                                          List<ParsedTrailer> parsedTrailers,
+                                          List<FileTrailer> trailers) {
+        for (int i = 0; i < parsedTrailers.size(); i++) {
+            if (parsedTrailers.get(i).getLineNumber() > p.getLineNumber()) {
+                return trailers.get(i);
+            }
+        }
+        return null;
     }
 }

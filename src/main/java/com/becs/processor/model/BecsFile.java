@@ -27,9 +27,6 @@ public class BecsFile {
     @Column(name = "file_path", nullable = false, length = 1024)
     private String filePath;
 
-    @Column(name = "file_size_bytes")
-    private Long fileSizeBytes;
-
     @Column(name = "received_at", nullable = false)
     private LocalDateTime receivedAt;
 
